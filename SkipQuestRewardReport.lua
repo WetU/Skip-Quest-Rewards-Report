@@ -431,8 +431,6 @@ local function preHook(args)
     end
 end
 
-local getItemNum_method = find_type_definition("app.ItemUtil"):get_method("getItemNum(app.ItemDef.ID, app.ItemUtil.STOCK_TYPE)");
-
 hook(GUIPartsRewardItems_type_def:get_method("allReceive"), function(args)
     if config.autoSkipSeamless and (config.autoSellRewardsSeamless or config.autoSellArtianSeamless or config.autoSellJewelSeamless or config.autoSellAmuletSeamless) then
         local this_ptr = args[2];
@@ -447,19 +445,13 @@ hook(GUIPartsRewardItems_type_def:get_method("allReceive"), function(args)
                         local ItemInfo_list = get__ItemInfoList_method:call(GUIRewardItems);
                         for j = 0, GenericList_get_Count_method:call(ItemInfo_list) - 1 do
                             local ItemInfo = GenericList_get_Item_method:call(ItemInfo_list, j);
-                            local ItemId = get_ItemId_method:call(ItemInfo);
-                            log.debug("prev Sell: " .. tostring(getItemNum_method:call(nil, ItemId, 2)));
                             sellReward_method:call(ItemInfo, true);
-                            log.debug("after Sell: " .. tostring(getItemNum_method:call(nil, ItemId, 2)));
                         end
                     elseif InfoType == RING_BUFFER then
                         local ItemInfo_RingBuffer = get__ItemInfosRingBuffer_method:call(GUIRewardItems);
                         for j = 0, RingBuffer_get_Size_method:call(ItemInfo_RingBuffer) - 1 do
                             local ItemInfo = RingBuffer_get_Item_method:call(ItemInfo_RingBuffer, j);
-                            local ItemId = get_ItemId_method:call(ItemInfo);
-                            log.debug("prev Sell: " .. tostring(getItemNum_method:call(nil, ItemId, 2)));
                             sellReward_method:call(ItemInfo, true);
-                            log.debug("after Sell: " .. tostring(getItemNum_method:call(nil, ItemId, 2)));
                         end
                     end
                 end
