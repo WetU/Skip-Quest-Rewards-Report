@@ -468,9 +468,14 @@ hook(GUIPartsRewardItems_type_def:get_method("allReceive"), function(args)
                             local ItemInfo = GenericList_get_Item_method:call(ItemInfo_list, j);
                             if config.autoSellArtianSeamless and get_ArtianPartsData_method:call(ItemInfo) ~= nil then
                                 sellReward_method:call(ItemInfo, true);
-                            elseif config.autoSellJewelSeamless and get_AccessoryId_method:call(ItemInfo) ~= nil then
-                                sellReward_method:call(ItemInfo, true);
-                            elseif config.autoSellAmuletSeamless and get_RandomAmuletData_method:call(ItemInfo) ~= nil and get_RandomAmuletType_method:call(ItemInfo) ~= nil then
+                            end
+                            if config.autoSellJewelSeamless then
+                                local AccessoryId = get_AccessoryId_method:call(ItemInfo);
+                                if AccessoryId > ACCESSORY_INVALID and AccessoryId < ACCESSORY_MAX then
+                                    sellReward_method:call(ItemInfo, true);
+                                end
+                            end
+                            if config.autoSellAmuletSeamless and get_RandomAmuletData_method:call(ItemInfo) ~= nil and get_RandomAmuletType_method:call(ItemInfo) ~= nil then
                                 sellReward_method:call(ItemInfo, true);
                             end
                         end
@@ -480,9 +485,14 @@ hook(GUIPartsRewardItems_type_def:get_method("allReceive"), function(args)
                             local ItemInfo = RingBuffer_get_Item_method:call(ItemInfo_RingBuffer, j);
                             if config.autoSellArtianSeamless and get_ArtianPartsData_method:call(ItemInfo) ~= nil then
                                 sellReward_method:call(ItemInfo, true);
-                            elseif config.autoSellJewelSeamless and get_AccessoryId_method:call(ItemInfo) ~= nil then
-                                sellReward_method:call(ItemInfo, true);
-                            elseif config.autoSellAmuletSeamless and get_RandomAmuletData_method:call(ItemInfo) ~= nil and get_RandomAmuletType_method:call(ItemInfo) ~= nil then
+                            end
+                            if config.autoSellJewelSeamless then
+                                local AccessoryId = get_AccessoryId_method:call(ItemInfo);
+                                if AccessoryId > ACCESSORY_INVALID and AccessoryId < ACCESSORY_MAX then
+                                    sellReward_method:call(ItemInfo, true);
+                                end
+                            end
+                            if config.autoSellAmuletSeamless and get_RandomAmuletData_method:call(ItemInfo) ~= nil and get_RandomAmuletType_method:call(ItemInfo) ~= nil then
                                 sellReward_method:call(ItemInfo, true);
                             end
                         end
