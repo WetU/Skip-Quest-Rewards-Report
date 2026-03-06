@@ -29,7 +29,7 @@ local end_disabled = imgui.end_disabled;
 local is_item_hovered = imgui.is_item_hovered;
 local set_tooltip = imgui.set_tooltip;
 
-local config = load_file("SkipQuestRewardReport.json") or {
+local defaults = {
     enable = true, 
     autoSellRewards = false,
     autoSellArtian = false,
@@ -49,59 +49,13 @@ local config = load_file("SkipQuestRewardReport.json") or {
     openNew = true,
     openWish = true
 };
-if config.enable == nil or type(config.enable) ~= "boolean" then
-    config.enable = true;
-end
-if config.autoSellRewards == nil or type(config.autoSellRewards) ~= "boolean" then
-    config.autoSellRewards = false;
-end
-if config.autoSellArtian == nil or type(config.autoSellArtian) ~= "boolean" then
-    config.autoSellArtian = false;
-end
-if config.autoSellGogma == nil or type(config.autoSellGogma) ~= "boolean" then
-    config.autoSellGogma = false;
-end
-if config.autoSellJewel == nil or type(config.autoSellJewel) ~= "boolean" then
-    config.autoSellJewel = false;
-end
-if config.haltNewItem == nil or type(config.haltNewItem) ~= "boolean" then
-    config.haltNewItem = true;
-end
-if config.showWish == nil or type(config.showWish) ~= "boolean" then
-    config.showWish = true;
-end
-if config.autoCloseConfirm == nil or type(config.autoCloseConfirm) ~= "boolean" then
-    config.autoCloseConfirm = true;
-end
-if config.enableSkipAmulet == nil or type(config.enableSkipAmulet) ~= "boolean" then
-    config.enableSkipAmulet = false;
-end
-if config.autoSellAmulet == nil or type(config.autoSellAmulet) ~= "boolean" then
-    config.autoSellAmulet = false;
-end
-if config.autoSkipSeamless == nil or type(config.autoSkipSeamless) ~= "boolean" then
-    config.autoSkipSeamless = true;
-end
-if config.autoSellRewardsSeamless == nil or type(config.autoSellRewardsSeamless) ~= "boolean" then
-    config.autoSellRewardsSeamless = false;
-end
-if config.autoSellArtianSeamless == nil or type(config.autoSellArtianSeamless) ~= "boolean" then
-    config.autoSellArtianSeamless = false;
-end
-if config.autoSellJewelSeamless == nil or type(config.autoSellJewelSeamless) ~= "boolean" then
-    config.autoSellJewelSeamless = false;
-end
-if config.autoSellAmuletSeamless == nil or type(config.autoSellAmuletSeamless) ~= "boolean" then
-    config.autoSellAmuletSeamless = false;
-end
-if config.openAmuletJudgeBox == nil or type(config.openAmuletJudgeBox) ~= "boolean" then
-    config.openAmuletJudgeBox = false;
-end
-if config.openNew == nil or type(config.openNew) ~= "boolean" then
-    config.openNew = true;
-end
-if config.openWish == nil or type(config.openWish) ~= "boolean" then
-    config.openWish = true;
+
+local config = load_file("SkipQuestRewardReport.json") or defaults;
+
+for k, v in _G.pairs(config) do
+    if v == nil or type(v) ~= "boolean" then
+        v = defaults[k];
+    end
 end
 
 local function saveConfig()
@@ -468,16 +422,19 @@ hook(GUIPartsRewardItems_type_def:get_method("allReceive"), function(args)
                             local ItemInfo = GenericList_get_Item_method:call(ItemInfo_list, j);
                             if config.autoSellArtianSeamless and get_ArtianPartsData_method:call(ItemInfo) ~= nil then
                                 sellReward_method:call(ItemInfo, true);
+                                goto continue;
                             end
                             if config.autoSellJewelSeamless then
                                 local AccessoryId = get_AccessoryId_method:call(ItemInfo);
                                 if AccessoryId > ACCESSORY_INVALID and AccessoryId < ACCESSORY_MAX then
                                     sellReward_method:call(ItemInfo, true);
+                                    goto continue;
                                 end
                             end
                             if config.autoSellAmuletSeamless and get_RandomAmuletData_method:call(ItemInfo) ~= nil and get_RandomAmuletType_method:call(ItemInfo) ~= nil then
                                 sellReward_method:call(ItemInfo, true);
                             end
+                            ::continue::
                         end
                     elseif InfoType == RING_BUFFER then
                         local ItemInfo_RingBuffer = get__ItemInfosRingBuffer_method:call(GUIRewardItems);
@@ -485,16 +442,19 @@ hook(GUIPartsRewardItems_type_def:get_method("allReceive"), function(args)
                             local ItemInfo = RingBuffer_get_Item_method:call(ItemInfo_RingBuffer, j);
                             if config.autoSellArtianSeamless and get_ArtianPartsData_method:call(ItemInfo) ~= nil then
                                 sellReward_method:call(ItemInfo, true);
+                                goto continue;
                             end
                             if config.autoSellJewelSeamless then
                                 local AccessoryId = get_AccessoryId_method:call(ItemInfo);
                                 if AccessoryId > ACCESSORY_INVALID and AccessoryId < ACCESSORY_MAX then
                                     sellReward_method:call(ItemInfo, true);
+                                    goto continue;
                                 end
                             end
                             if config.autoSellAmuletSeamless and get_RandomAmuletData_method:call(ItemInfo) ~= nil and get_RandomAmuletType_method:call(ItemInfo) ~= nil then
                                 sellReward_method:call(ItemInfo, true);
                             end
+                            ::continue::
                         end
                     end
                 end
