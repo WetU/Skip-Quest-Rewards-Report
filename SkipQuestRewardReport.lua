@@ -5,7 +5,6 @@ local type = _G.type;
 local sdk = _G.sdk;
 local find_type_definition = sdk.find_type_definition;
 local get_managed_singleton = sdk.get_managed_singleton;
-local set_native_field = sdk.set_native_field;
 local hook = sdk.hook;
 local to_int64 = sdk.to_int64;
 local PreHookResult = sdk.PreHookResult;
@@ -61,10 +60,10 @@ end
 local function saveConfig()
     dump_file("SkipQuestRewardReport.json", config);
 end
---<< GUI070000 Fix Quest Result >>--
-local UI070000 = find_type_definition("app.GUIID.ID"):get_field("UI070000"):get_data(nil);
 
 local isItemRequiredForWishlist_method = find_type_definition("app.WishlistUtil"):get_method("isItemRequiredForWishlist(app.ItemDef.ID)");
+--<< GUI070000 Fix Quest Result >>--
+local UI070000 = find_type_definition("app.GUIID.ID"):get_field("UI070000"):get_data(nil);
 
 local get_IDInt_method = find_type_definition("ace.GUIBase`2<app.GUIID.ID,app.GUIFunc.TYPE>"):get_method("get_IDInt");
 
@@ -85,22 +84,17 @@ local GUIPartsReward_JUDGE = GUIPartsReward_MODE_type_def:get_field("JUDGE"):get
 local GUIPartsRewardInfo_get_RewardItems_method = find_type_definition("app.cGUIPartsRewardInfo"):get_method("get_RewardItems");
 
 local GUIRewardItems_type_def = find_type_definition("app.cGUIRewardItems");
-local get__ItemInfosRingBuffer_method = GUIRewardItems_type_def:get_method("get__ItemInfosRingBuffer");
-local get__ItemInfoList_method = GUIRewardItems_type_def:get_method("get__ItemInfoList");
-local get__InfoType_method = GUIRewardItems_type_def:get_method("get__InfoType");
+local get_ItemInfoSize_method = GUIRewardItems_type_def:get_method("get_ItemInfoSize");
+local getItemInfo_method = GUIRewardItems_type_def:get_method("getItemInfo(System.Int32)");
 
-local RingBuffer_type_def = get__ItemInfosRingBuffer_method:get_return_type();
-local RingBuffer_get_Size_method = RingBuffer_type_def:get_method("get_Size");
-local RingBuffer_get_Item_method = RingBuffer_type_def:get_method("get_Item(System.Int32)");
-
-local SendItemInfo_type_def = RingBuffer_get_Item_method:get_return_type();
+local SendItemInfo_type_def = getItemInfo_method:get_return_type();
+local getReward_method = SendItemInfo_type_def:get_method("getReward(System.Boolean, System.Boolean)");
 local sellReward_method = SendItemInfo_type_def:get_method("sellReward(System.Boolean)");
 
 local ReceiveItemInfo_type_def = SendItemInfo_type_def:get_parent_type();
 local get_ArtianPartsData_method = ReceiveItemInfo_type_def:get_method("get_ArtianPartsData");
 local get_AccessoryId_method = ReceiveItemInfo_type_def:get_method("get_AccessoryId");
 local get_RandomAmuletData_method = ReceiveItemInfo_type_def:get_method("get_RandomAmuletData");
-local get_RandomAmuletType_method = ReceiveItemInfo_type_def:get_method("get_RandomAmuletType");
 local get_ItemId_method = ReceiveItemInfo_type_def:get_method("get_ItemId");
 
 local get_IsEm0078_ArtianParts_method = get_ArtianPartsData_method:get_return_type():get_method("get_IsEm0078_ArtianParts");
@@ -129,16 +123,7 @@ local GUI070001_type_def = find_type_definition("app.GUI070001");
 local get_IsViewMode_method = GUI070001_type_def:get_method("get_IsViewMode");
 local skipAnimation_method = GUI070001_type_def:get_method("skipAnimation");
 
-local INFO_TYPE_type_def = get__InfoType_method:get_return_type();
-local LIST = INFO_TYPE_type_def:get_field("LIST"):get_data(nil);
-local RING_BUFFER = INFO_TYPE_type_def:get_field("RING_BUFFER"):get_data(nil);
-
 local shouldSellConfirm = false;
-
-local function auto_sell(obj)
-    sellAll_method:call(obj);
-    shouldSellConfirm = true;
-end
 
 local function hasNewItem(ItemGridParts, isFix)
     if isFix then
@@ -161,30 +146,18 @@ end
 local function hasWishItem(RewardItems_list)
     for i = 0, GenericList_get_Count_method:call(RewardItems_list) - 1 do
         local RewardItems = GenericList_get_Item_method:call(RewardItems_list, i);
-        local InfoType = get__InfoType_method:call(RewardItems);
-        if InfoType == LIST then
-            local ItemInfo_list = get__ItemInfoList_method:call(RewardItems);
-            for j = 0, GenericList_get_Count_method:call(ItemInfo_list) - 1 do
-                if isItemRequiredForWishlist_method:call(nil, get_ItemId_method:call(GenericList_get_Item_method:call(ItemInfo_list, j))) then
-                    return true;
-                end
-            end
-        elseif InfoType == RING_BUFFER then
-            local ItemInfo_RingBuffer = get__ItemInfosRingBuffer_method:call(RewardItems);
-            for j = 0, RingBuffer_get_Size_method:call(ItemInfo_RingBuffer) - 1 do
-                if isItemRequiredForWishlist_method:call(nil, get_ItemId_method:call(RingBuffer_get_Item_method:call(ItemInfo_RingBuffer, j))) then
-                    return true;
-                end
+        for j = 0, get_ItemInfoSize_method:call(RewardItems) - 1 do
+            if isItemRequiredForWishlist_method:call(nil, get_ItemId_method:call(getItemInfo_method:call(RewardItems, j))) then
+                return true;
             end
         end
     end
     return false;
 end
 
-local function receiveAll(obj)
-    if get_InputPriority_method:call(GUIPartsReward_InputCtrl_field:get_data(obj)) == 0 then
-        receiveAll_method:call(obj);
-    end
+local function auto_sell(obj)
+    sellAll_method:call(obj);
+    shouldSellConfirm = true;
 end
 
 local isFixQuestResult = nil;
@@ -192,12 +165,41 @@ hook(GUIPartsReward_type_def:get_method("start(app.cGUIPartsRewardInfo, app.cGUI
     if config.enable and (to_int64(args[5]) & 1) == 0 then
         local this_ptr = args[2];
         if get_IDInt_method:call(get_Owner_method:call(this_ptr)) == UI070000 then
+            local Mode = to_int64(args[4]) & 0xFFFFFFFF;
             local storage = get_hook_storage();
             storage.this_ptr = this_ptr;
-            if config.autoSellRewards == false and (config.autoSellArtian or config.autoSellJewel or config.showWish) then
-                storage.GUIPartsRewardInfo = args[3];
+            storage.Mode = (to_int64(args[6]) & 1) == 1 and 2 or Mode;
+            if Mode == GUIPartsReward_REWARD then
+                if config.showWish then
+                    storage.GUIPartsRewardInfo = args[3];
+                end
+            elseif Mode == GUIPartsReward_JUDGE then
+                if config.autoSellRewards == false and (config.autoSellArtian or config.autoSellGogma or config.autoSellJewel) then
+                    local GUIRewardItems_list = GUIPartsRewardInfo_get_RewardItems_method:call(args[3]);
+                    for i = 0, GenericList_get_Count_method:call(GUIRewardItems_list) - 1 do
+                        local GUIRewardItems = GenericList_get_Item_method:call(GUIRewardItems_list, i);
+                        for j = 0, get_ItemInfoSize_method:call(GUIRewardItems) - 1 do
+                            local ItemInfo = getItemInfo_method:call(GUIRewardItems, j);
+                            if config.autoSellArtian or config.autoSellGogma then
+                                local ArtianPartsData = get_ArtianPartsData_method:call(ItemInfo);
+                                if ArtianPartsData ~= nil then
+                                    if (config.autoSellGogma and get_IsEm0078_ArtianParts_method:call(ArtianPartsData)) or config.autoSellArtian then
+                                        sellReward_method:call(ItemInfo, true);
+                                        goto continue;
+                                    end
+                                end
+                            end
+                            if config.autoSellJewel then
+                                local AccessoryId = get_AccessoryId_method:call(ItemInfo);
+                                if AccessoryId > ACCESSORY_INVALID and AccessoryId < ACCESSORY_MAX then
+                                    sellReward_method:call(ItemInfo, true);
+                                end
+                            end
+                            ::continue::
+                        end
+                    end
+                end
             end
-            storage.Mode = (to_int64(args[6]) & 1) == 1 and 2 or to_int64(args[4]) & 0xFFFFFFFF;
             isFixQuestResult = true;
         end
     end
@@ -209,82 +211,33 @@ end, function()
         set__WaitControlTime_method:call(this_ptr, 0.0);
         local Mode = storage.Mode;
         if Mode == GUIPartsReward_REWARD then
-            if config.autoSellRewards then
-                auto_sell(this_ptr);
-            else
-                if (config.haltNewItem and hasNewItem(ItemGridParts_field:get_data(this_ptr), true)) or (config.showWish and hasWishItem(GUIPartsRewardInfo_get_RewardItems_method:call(storage.GUIPartsRewardInfo))) then
-                    return;
+            if (config.haltNewItem == false or hasNewItem(ItemGridParts_field:get_data(this_ptr), true) == false)
+            and (config.showWish == false or hasWishItem(GUIPartsRewardInfo_get_RewardItems_method:call(storage.GUIPartsRewardInfo)) == false)
+            and get_InputPriority_method:call(GUIPartsReward_InputCtrl_field:get_data(this_ptr)) == 0 then
+                if config.autoSellRewards then
+                    auto_sell(this_ptr);
+                else
+                    receiveAll_method:call(this_ptr);
                 end
-                receiveAll(this_ptr);
             end
         elseif Mode == GUIPartsReward_JUDGE then
-            if config.autoSellArtian or config.autoSellGogma or config.autoSellJewel then
-                local GUIRewardItems_list = GUIPartsRewardInfo_get_RewardItems_method:call(storage.GUIPartsRewardInfo);
-                for i = 0, GenericList_get_Count_method:call(GUIRewardItems_list) - 1 do
-                    local GUIRewardItems = GenericList_get_Item_method:call(GUIRewardItems_list, i);
-                    local InfoType = get__InfoType_method:call(GUIRewardItems);
-                    if InfoType == LIST then
-                        local ItemInfo_list = get__ItemInfoList_method:call(GUIRewardItems);
-                        for j = 0, GenericList_get_Count_method:call(ItemInfo_list) - 1 do
-                            local ItemInfo = GenericList_get_Item_method:call(ItemInfo_list, j);
-                            if config.autoSellArtian or config.autoSellGogma then
-                                local ArtianPartsData = get_ArtianPartsData_method:call(ItemInfo);
-                                if ArtianPartsData ~= nil then
-                                    if get_IsEm0078_ArtianParts_method:call(ArtianPartsData) then
-                                        if config.autoSellGogma then
-                                            sellReward_method:call(ItemInfo, true);
-                                        end
-                                    elseif config.autoSellArtian then
-                                        sellReward_method:call(ItemInfo, true);
-                                    end
-                                end
-                            end
-                            if config.autoSellJewel then
-                                local AccessoryId = get_AccessoryId_method:call(ItemInfo);
-                                if AccessoryId > ACCESSORY_INVALID and AccessoryId < ACCESSORY_MAX then
-                                    sellReward_method:call(ItemInfo, true);
-                                end
-                            end
-                        end
-                    elseif InfoType == RING_BUFFER then
-                        local ItemInfo_RingBuffer = get__ItemInfosRingBuffer_method:call(GUIRewardItems);
-                        for j = 0, RingBuffer_get_Size_method:call(ItemInfo_RingBuffer) - 1 do
-                            local ItemInfo = RingBuffer_get_Item_method:call(ItemInfo_RingBuffer, j);
-                            if config.autoSellArtian or config.autoSellGogma then
-                                local ArtianPartsData = get_ArtianPartsData_method:call(ItemInfo);
-                                if ArtianPartsData ~= nil then
-                                    if get_IsEm0078_ArtianParts_method:call(ArtianPartsData) then
-                                        if config.autoSellGogma then
-                                            sellReward_method:call(ItemInfo, true);
-                                        end
-                                    elseif config.autoSellArtian then
-                                        sellReward_method:call(ItemInfo, true);
-                                    end
-                                end
-                            end
-                            if config.autoSellJewel then
-                                local AccessoryId = get_AccessoryId_method:call(ItemInfo);
-                                if AccessoryId > ACCESSORY_INVALID and AccessoryId < ACCESSORY_MAX then
-                                    sellReward_method:call(ItemInfo, true);
-                                end
-                            end
-                        end
-                    end
+            if (config.haltNewItem and hasNewItem(ItemGridParts_field:get_data(this_ptr), true)) or get_InputPriority_method:call(GUIPartsReward_InputCtrl_field:get_data(this_ptr)) ~= 0 then
+                set__WaitAnimationTime_method:call(this_ptr, 0.01);
+            else
+                if config.autoSellRewards then
+                    auto_sell(this_ptr);
+                else
+                    receiveAll_method:call(this_ptr);
                 end
             end
-            if config.haltNewItem and hasNewItem(ItemGridParts_field:get_data(this_ptr), true) then
-                set__WaitAnimationTime_method:call(this_ptr, 0.01);
-                return;
-            end
-            receiveAll(this_ptr);
         else
-            if config.enableSkipAmulet then
+            if config.autoSellRewards or config.autoSellAmulet then
                 if get_InputPriority_method:call(GUIPartsReward_InputCtrl_field:get_data(this_ptr)) == 0 then
-                    if config.autoSellAmulet then
-                        auto_sell(this_ptr);
-                    else
-                        receiveAll_method:call(this_ptr);
-                    end
+                    auto_sell(this_ptr);
+                end
+            elseif config.enableSkipAmulet then
+                if get_InputPriority_method:call(GUIPartsReward_InputCtrl_field:get_data(this_ptr)) == 0 then
+                    receiveAll_method:call(this_ptr);
                 end
             else
                 set__WaitAnimationTime_method:call(this_ptr, 0.01);
@@ -394,70 +347,44 @@ hook(GUIPartsRewardItems_type_def:get_method("allReceive"), function(args)
                 local GUIRewardItems_list = GUIPartsRewardItems_get_RewardItems_method:call(this_ptr);
                 for i = 0, GenericList_get_Count_method:call(GUIRewardItems_list) - 1 do
                     local GUIRewardItems = GenericList_get_Item_method:call(GUIRewardItems_list, i);
-                    local InfoType = get__InfoType_method:call(GUIRewardItems);
-                    if InfoType == LIST then
-                        local ItemInfo_list = get__ItemInfoList_method:call(GUIRewardItems);
-                        for j = 0, GenericList_get_Count_method:call(ItemInfo_list) - 1 do
-                            local ItemInfo = GenericList_get_Item_method:call(ItemInfo_list, j);
-                            sellReward_method:call(ItemInfo, true);
-                        end
-                    elseif InfoType == RING_BUFFER then
-                        local ItemInfo_RingBuffer = get__ItemInfosRingBuffer_method:call(GUIRewardItems);
-                        for j = 0, RingBuffer_get_Size_method:call(ItemInfo_RingBuffer) - 1 do
-                            local ItemInfo = RingBuffer_get_Item_method:call(ItemInfo_RingBuffer, j);
-                            sellReward_method:call(ItemInfo, true);
-                        end
+                    for j = 0, get_ItemInfoSize_method:call(GUIRewardItems) - 1 do
+                        sellReward_method:call(getItemInfo_method:call(GUIRewardItems, j), true);
                     end
                 end
+                return SKIP_ORIGINAL;
             end
         elseif MODE == GUIPartsRewardItems_JUDGE then
             if config.autoSellArtianSeamless or config.autoSellJewelSeamless or config.autoSellAmuletSeamless then
                 local GUIRewardItems_list = GUIPartsRewardItems_get_RewardItems_method:call(this_ptr);
                 for i = 0, GenericList_get_Count_method:call(GUIRewardItems_list) - 1 do
                     local GUIRewardItems = GenericList_get_Item_method:call(GUIRewardItems_list, i);
-                    local InfoType = get__InfoType_method:call(GUIRewardItems);
-                    if InfoType == LIST then
-                        local ItemInfo_list = get__ItemInfoList_method:call(GUIRewardItems);
-                        for j = 0, GenericList_get_Count_method:call(ItemInfo_list) - 1 do
-                            local ItemInfo = GenericList_get_Item_method:call(ItemInfo_list, j);
-                            if config.autoSellArtianSeamless and get_ArtianPartsData_method:call(ItemInfo) ~= nil then
+                    for j = 0, get_ItemInfoSize_method:call(GUIRewardItems) - 1 do
+                        local ItemInfo = getItemInfo_method:call(GUIRewardItems, j);
+                        if get_ArtianPartsData_method:call(ItemInfo) ~= nil then
+                            if config.autoSellArtianSeamless then
                                 sellReward_method:call(ItemInfo, true);
-                                goto continue;
+                            else
+                                getReward_method:call(ItemInfo, true, false);
                             end
-                            if config.autoSellJewelSeamless then
-                                local AccessoryId = get_AccessoryId_method:call(ItemInfo);
-                                if AccessoryId > ACCESSORY_INVALID and AccessoryId < ACCESSORY_MAX then
+                        elseif get_RandomAmuletData_method:call(ItemInfo) ~= nil then
+                            if config.autoSellAmuletSeamless then
+                                sellReward_method:call(ItemInfo, true);
+                            else
+                                getReward_method:call(ItemInfo, true, false);
+                            end
+                        else
+                            local AccessoryId = get_AccessoryId_method:call(ItemInfo);
+                            if AccessoryId > ACCESSORY_INVALID and AccessoryId < ACCESSORY_MAX then
+                                if config.autoSellJewelSeamless then
                                     sellReward_method:call(ItemInfo, true);
-                                    goto continue;
+                                else
+                                    getReward_method:call(ItemInfo, false, false);
                                 end
                             end
-                            if config.autoSellAmuletSeamless and get_RandomAmuletData_method:call(ItemInfo) ~= nil and get_RandomAmuletType_method:call(ItemInfo) ~= nil then
-                                sellReward_method:call(ItemInfo, true);
-                            end
-                            ::continue::
-                        end
-                    elseif InfoType == RING_BUFFER then
-                        local ItemInfo_RingBuffer = get__ItemInfosRingBuffer_method:call(GUIRewardItems);
-                        for j = 0, RingBuffer_get_Size_method:call(ItemInfo_RingBuffer) - 1 do
-                            local ItemInfo = RingBuffer_get_Item_method:call(ItemInfo_RingBuffer, j);
-                            if config.autoSellArtianSeamless and get_ArtianPartsData_method:call(ItemInfo) ~= nil then
-                                sellReward_method:call(ItemInfo, true);
-                                goto continue;
-                            end
-                            if config.autoSellJewelSeamless then
-                                local AccessoryId = get_AccessoryId_method:call(ItemInfo);
-                                if AccessoryId > ACCESSORY_INVALID and AccessoryId < ACCESSORY_MAX then
-                                    sellReward_method:call(ItemInfo, true);
-                                    goto continue;
-                                end
-                            end
-                            if config.autoSellAmuletSeamless and get_RandomAmuletData_method:call(ItemInfo) ~= nil and get_RandomAmuletType_method:call(ItemInfo) ~= nil then
-                                sellReward_method:call(ItemInfo, true);
-                            end
-                            ::continue::
                         end
                     end
                 end
+                return SKIP_ORIGINAL;
             end
         end
     end
@@ -469,16 +396,15 @@ hook(GUI020100_type_def:get_method("toQuestReward"), preHook, function()
         local GUI020100PanelQuestRewardItem = get__PartsQuestRewardItem_method:call(this_ptr);
         if config.openNew or config.openWish then
             local GUIPartsRewardItems = get__PartsQuestRewardItems_method:call(GUI020100PanelQuestRewardItem);
-            if config.openNew and hasNewItem(GUIPartsRewardItems_ItemGridParts_field:get_data(GUIPartsRewardItems), false) then
+            if (config.openNew and hasNewItem(GUIPartsRewardItems_ItemGridParts_field:get_data(GUIPartsRewardItems), false))
+            or (config.openWish and hasWishItem(GUIPartsRewardItems_get_RewardItems_method:call(GUIPartsRewardItems))) then
                 requestCallTrigger_method:call(GUI020100_InputCtrl_field:get_data(this_ptr), JUST_TIMING_SHORTCUT);
-                return;
+            else
+                finish_method:call(get_FixControl_method:call(GUI020100PanelQuestRewardItem));
             end
-            if config.openWish and hasWishItem(GUIPartsRewardItems_get_RewardItems_method:call(GUIPartsRewardItems)) then
-                requestCallTrigger_method:call(GUI020100_InputCtrl_field:get_data(this_ptr), JUST_TIMING_SHORTCUT);
-                return;
-            end
+        else
+            finish_method:call(get_FixControl_method:call(GUI020100PanelQuestRewardItem));
         end
-        finish_method:call(get_FixControl_method:call(GUI020100PanelQuestRewardItem));
     end
 end);
 
@@ -491,7 +417,7 @@ end);
 hook(GUI020100_type_def:get_method("toRandomAmuletJudge"), preHook, function()
     if config.autoSkipSeamless then
         local this_ptr = get_hook_storage().this_ptr;
-        if config.openAmuletJudgeBox then
+        if config.autoSellAmuletSeamless == false and config.openAmuletJudgeBox then
             requestCallTrigger_method:call(GUI020100_InputCtrl_field:get_data(this_ptr), JUST_TIMING_SHORTCUT);
         else
             finish_method:call(get_FixControl_method:call(get__PartsQuestRewardItem_method:call(this_ptr)));
@@ -509,6 +435,15 @@ hook(find_type_definition("app.cGUIQuestResultInfo"):get_method("getSeamlesResul
     return config.autoSkipSeamless and SKIP_ORIGINAL or CALL_ORIGINAL;
 end, function(retval)
     return config.autoSkipSeamless and ZERO_float_ptr or retval;
+end);
+
+hook(getReward_method, function(args)
+    local this_ptr = args[2];
+    local ArtianData = get_ArtianPartsData_method:call(this_ptr);
+    local AccessoryId = get_AccessoryId_method:call(this_ptr);
+    log.debug("This item is " .. get_RandomAmuletData_method:call(this_ptr) ~= nil and "RandomAmulet" or AccessoryId > ACCESSORY_INVALID and AccessoryId < ACCESSORY_MAX and "Jewel" or ArtianData ~= nil and get_IsEm0078_ArtianParts_method:call(ArtianData) and "Gogma Material" or "Artian part");
+    log.debug("args3 : " .. tostring(to_int64(args[3]) & 1));
+    log.debug("args4 : " .. tostring(to_int64(args[4]) & 1));
 end);
 
 re.on_config_save(saveConfig);
